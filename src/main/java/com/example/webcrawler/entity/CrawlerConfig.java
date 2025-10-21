@@ -22,6 +22,7 @@ public class CrawlerConfig {
     private String seedUrls;
 
     private Integer maxDepth;
+
     @Column(length = 1024)
     private String keywordsToSearch;
 
@@ -32,6 +33,7 @@ public class CrawlerConfig {
 
     private LocalDateTime createdAt;
     private LocalDateTime lastRunAt;
+
 
     @Enumerated(EnumType.STRING)
     private ConfigStatus status;
@@ -45,4 +47,5 @@ public class CrawlerConfig {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
     }
+
 }

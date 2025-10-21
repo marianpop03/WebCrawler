@@ -9,30 +9,29 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
-@Table(name = "urls") // Numele tabelului în baza de date
-@Data // Generates getters, setters, toString, equals, and hashCode methods
-@NoArgsConstructor // Generates a constructor with no arguments
-@AllArgsConstructor // Generates a constructor with all arguments
+@Table(name = "urls")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class Url {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 2048) // Limită de 2048 pentru URL-uri lungi
+    @Column(nullable = false, unique = true, length = 2048)
     private String url;
 
     private LocalDateTime visitDate;
 
-    private boolean deepScan; // True dacă URL-ul a fost vizitat în cadrul unui deep scan
+    private boolean deepScan;
 
-    @Enumerated(EnumType.STRING) // Stochează enum-ul ca string în baza de date
-    private UrlStatus status; // PENDING, VISITED, FAILED
+    @Enumerated(EnumType.STRING)
+    private UrlStatus status;
 
     @OneToMany(mappedBy = "url", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<PageContent> pageContents; // Asociază conținutul paginii cu URL-ul
+    private List<PageContent> pageContents;
 
-    // Enum pentru statusul URL-ului
     public enum UrlStatus {
         PENDING,
         VISITED,

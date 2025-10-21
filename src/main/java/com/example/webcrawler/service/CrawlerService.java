@@ -233,16 +233,12 @@ public class CrawlerService {
      */
     private void extractLinks(Document doc, String baseUrl, int currentDepth) throws URISyntaxException {
         Elements links = doc.select("a[href]");
-        String baseHost = new URI(baseUrl).getHost();
 
         for (Element link : links) {
             String absUrl = link.attr("abs:href");
             if (!isValidUrl(absUrl) || isFileUrl(absUrl)) {
                 continue;
             }
-
-
-            // if (!isSameDomain(absUrl, baseHost)) { continue; }
 
             if (!visitedUrls.contains(absUrl) && !urlQueue.contains(absUrl)) {
                 urlQueue.offer(absUrl);
@@ -296,7 +292,7 @@ public class CrawlerService {
     private boolean isValidUrl(String url) {
         try {
             new URI(url).parseServerAuthority();
-            return (url.startsWith("http://") || url.startsWith("https://"));
+            return (url.startsWith("http`://") || url.startsWith("https://"));
         } catch (URISyntaxException e) {
             return false;
         }

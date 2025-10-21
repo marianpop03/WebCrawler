@@ -63,7 +63,7 @@ public class WebController {
     @PostMapping("/saveConfig")
     public String saveConfig(@ModelAttribute CrawlerConfig crawlerConfig, RedirectAttributes redirectAttributes) {
 
-        if (crawlerConfig.getStatus() == null) {
+        if (crawlerConfig.getStatus()==null) {
             crawlerConfig.setStatus(CrawlerConfig.ConfigStatus.ACTIVE);
         }
         crawlerConfigRepository.save(crawlerConfig);
@@ -80,7 +80,12 @@ public class WebController {
     @GetMapping("/editConfig")
     public String editConfig(@RequestParam Long id, Model model) {
         Optional<CrawlerConfig> configOptional = crawlerConfigRepository.findById(id);
-        configOptional.ifPresent(config -> model.addAttribute("crawlerConfig", config));
+        if (configOptional.isPresent()) {
+            model.addAttribute("crawlerConfig", configOptional.get());
+        } else {
+            model.addAttribute("crawlerConfig", new CrawlerConfig());
+            model.addAttribute("errorMessage", "Configurația cu ID-ul " + id + " nu a fost găsită.");
+        }
         return index(model);
     }
 
@@ -161,7 +166,7 @@ public class WebController {
         if (keyword != null && !keyword.trim().isEmpty()) {
             searchResults = searchService.searchByKeyword(keyword);
         }
-        model.addAttribute("keyword", keyword); // Pentru a pre-completa câmpul de căutare
+        model.addAttribute("keyword", keyword);
         model.addAttribute("searchResults", searchResults);
         return "searchResults";
     }

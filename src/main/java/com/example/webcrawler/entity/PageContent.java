@@ -20,14 +20,15 @@ public class PageContent {
     @JoinColumn(name = "url_id", nullable = false)
     private Url url;
 
-    @Lob
+    @Column(columnDefinition = "LONGTEXT")
     private String contentText;
 
     @Column(length = 512)
     private String pageTitle;
 
-    @Lob
-    private String metadata; // Ex: description, keywords
+
+    @Column(columnDefinition = "TEXT")
+    private String metadata;
 
     public PageContent(Url url, String contentText, String pageTitle, String metadata) {
         this.url = url;

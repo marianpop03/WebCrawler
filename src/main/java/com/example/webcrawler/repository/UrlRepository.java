@@ -14,5 +14,4 @@ public interface UrlRepository extends JpaRepository<Url, Long> {
 
     List<Url> findByStatus(Url.UrlStatus status);
 
-    List<Url> findByDeepScanTrueAndStatus(Url.UrlStatus status);
 }
