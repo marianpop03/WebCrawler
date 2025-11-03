@@ -13,5 +13,5 @@ public interface UrlRepository extends JpaRepository<Url, Long> {
 
 
     List<Url> findByStatus(Url.UrlStatus status);
-
+    long countByStatus(Url.UrlStatus status);
 }

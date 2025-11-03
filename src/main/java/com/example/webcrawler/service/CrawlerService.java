@@ -15,7 +15,7 @@ import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -37,6 +37,8 @@ public class CrawlerService {
 
     @Autowired
     private UrlRepository urlRepository;
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
 
     @Autowired
     private PageContentRepository pageContentRepository;
@@ -218,7 +220,7 @@ public class CrawlerService {
         pageContentRepository.save(pageContent);
 
         log.info("Conținut salvat pentru URL: {}", currentUrl);
-
+        sendCrawlerStatusUpdate();
 
         if (currentConfig.getMaxDepth() != null && currentConfig.getMaxDepth() > depth) {
             extractLinks(doc, currentUrl, depth);
@@ -264,6 +266,7 @@ public class CrawlerService {
         urlEntity.setStatus(status);
         urlEntity.setVisitDate(LocalDateTime.now());
         urlRepository.save(urlEntity);
+        sendCrawlerStatusUpdate();
     }
 
     /**
@@ -305,6 +308,20 @@ public class CrawlerService {
         String lowerUrl = url.toLowerCase();
         return (currentConfig.isExcludeImages() && (lowerUrl.endsWith(".jpg") || lowerUrl.endsWith(".jpeg") || lowerUrl.endsWith(".png") || lowerUrl.endsWith(".gif"))) ||
                 (currentConfig.isExcludePdfs() && lowerUrl.endsWith(".pdf"));
+    }
+    private void sendCrawlerStatusUpdate() {
+
+        long visitedCount = urlRepository.countByStatus(Url.UrlStatus.VISITED);
+        long pendingCount = urlRepository.countByStatus(Url.UrlStatus.PENDING);
+        long failedCount = urlRepository.countByStatus(Url.UrlStatus.FAILED);
+
+        var statusUpdate = new java.util.HashMap<String, Object>();
+        statusUpdate.put("isRunning", isRunning.get());
+        statusUpdate.put("visitedCount", visitedCount);
+        statusUpdate.put("pendingCount", pendingCount);
+        statusUpdate.put("failedCount", failedCount);
+        messagingTemplate.convertAndSend("/topic/crawlerStatus", statusUpdate);
+        log.debug("Trimis actualizare status crawler prin WebSocket.");
     }
 
 

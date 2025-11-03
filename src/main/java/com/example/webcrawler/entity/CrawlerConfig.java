@@ -34,7 +34,6 @@ public class CrawlerConfig {
     private LocalDateTime createdAt;
     private LocalDateTime lastRunAt;
 
-
     @Enumerated(EnumType.STRING)
     private ConfigStatus status;
 
@@ -47,5 +46,4 @@ public class CrawlerConfig {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
     }
-
 }

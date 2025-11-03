@@ -10,13 +10,12 @@
         .container { max-width: 1000px; }
         .status-badge { margin-left: 10px; }
     </style>
-
-    <meta http-equiv="refresh" content="5">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
 </head>
 <body>
 <div class="container">
     <h1 class="mb-4">Status Crawler</h1>
-
     <ul class="nav nav-tabs mb-4">
         <li class="nav-item">
             <a class="nav-link" href="/">Acasă</a>
@@ -38,13 +37,14 @@
         <div class="col-md-4">
             <div class="card mb-4">
                 <div class="card-header bg-success text-white">
-                    URL-uri Vizitate (<span th:text="${visitedUrls.size()}">0</span>)
+                    URL-uri Vizitate (<span id="visitedCount" th:text="${visitedUrls.size()}">0</span>)
                 </div>
                 <div class="card-body">
-                    <div th:if="${visitedUrls.isEmpty()}" class="alert alert-info">
+                    <div th:if="${visitedUrls.isEmpty()}" class="alert alert-info" id="visitedEmptyMessage">
                         Niciun URL vizitat încă.
                     </div>
-                    <ul class="list-group list-group-flush scrollable-list" style="max-height: 400px; overflow-y: auto;">
+                    <ul class="list-group list-group-flush scrollable-list" style="max-height: 400px; overflow-y: auto;" id="visitedUrlsList">
+                        <!-- Acestea vor fi populate dinamic de JavaScript, dar le lăsăm pentru prima încărcare -->
                         <li th:each="url : ${visitedUrls}" class="list-group-item">
                             <a th:href="${url.url}" th:text="${url.url}" target="_blank"></a>
                             <small class="text-muted d-block" th:text="${'Vizitat la: ' + #temporals.format(url.visitDate, 'dd-MM-yyyy HH:mm:ss')}"></small>
@@ -56,13 +56,13 @@
         <div class="col-md-4">
             <div class="card mb-4">
                 <div class="card-header bg-warning text-dark">
-                    URL-uri în Așteptare (<span th:text="${pendingUrls.size()}">0</span>)
+                    URL-uri în Așteptare (<span id="pendingCount" th:text="${pendingUrls.size()}">0</span>)
                 </div>
                 <div class="card-body">
-                    <div th:if="${pendingUrls.isEmpty()}" class="alert alert-info">
+                    <div th:if="${pendingUrls.isEmpty()}" class="alert alert-info" id="pendingEmptyMessage">
                         Niciun URL în așteptare.
                     </div>
-                    <ul class="list-group list-group-flush scrollable-list" style="max-height: 400px; overflow-y: auto;">
+                    <ul class="list-group list-group-flush scrollable-list" style="max-height: 400px; overflow-y: auto;" id="pendingUrlsList">
                         <li th:each="url : ${pendingUrls}" class="list-group-item">
                             <span th:text="${url.url}"></span>
                         </li>
@@ -73,13 +73,13 @@
         <div class="col-md-4">
             <div class="card mb-4">
                 <div class="card-header bg-danger text-white">
-                    URL-uri Eșuate (<span th:text="${failedUrls.size()}">0</span>)
+                    URL-uri Eșuate (<span id="failedCount" th:text="${failedUrls.size()}">0</span>)
                 </div>
                 <div class="card-body">
-                    <div th:if="${failedUrls.isEmpty()}" class="alert alert-info">
+                    <div th:if="${failedUrls.isEmpty()}" class="alert alert-info" id="failedEmptyMessage">
                         Niciun URL eșuat.
                     </div>
-                    <ul class="list-group list-group-flush scrollable-list" style="max-height: 400px; overflow-y: auto;">
+                    <ul class="list-group list-group-flush scrollable-list" style="max-height: 400px; overflow-y: auto;" id="failedUrlsList">
                         <li th:each="url : ${failedUrls}" class="list-group-item">
                             <span th:text="${url.url}"></span>
                         </li>
@@ -90,6 +90,57 @@
     </div>
 
 </div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+<script>
+    var stompClient = null;
+
+    function connect() {
+        var socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+        stompClient.connect({}, function (frame) {
+            console.log('Conectat: ' + frame);
+
+            stompClient.subscribe('/topic/crawlerStatus', function (message) {
+                showCrawlerStatus(JSON.parse(message.body));
+            });
+        }, function (error) {
+            console.error('Eroare de conectare STOMP: ' + error);
+            setTimeout(connect, 5000);
+        });
+    }
+
+    function disconnect() {
+        if (stompClient !== null) {
+            stompClient.disconnect();
+        }
+        console.log("Deconectat");
+    }
+
+    function showCrawlerStatus(statusUpdate) {
+        var statusBadge = document.querySelector('.status-badge');
+        if (statusUpdate.isRunning) {
+            statusBadge.classList.remove('bg-secondary');
+            statusBadge.classList.add('bg-success');
+            statusBadge.textContent = 'Rulează';
+        } else {
+            statusBadge.classList.remove('bg-success');
+            statusBadge.classList.add('bg-secondary');
+            statusBadge.textContent = 'Oprit';
+        }
+
+        document.getElementById('visitedCount').textContent = statusUpdate.visitedCount;
+        document.getElementById('pendingCount').textContent = statusUpdate.pendingCount;
+        document.getElementById('failedCount').textContent = statusUpdate.failedCount;
+    }
+
+    window.onload = function() {
+        connect();
+    };
+    window.onbeforeunload = function() {
+        disconnect();
+    };
+</script>
 </body>
 </html>
