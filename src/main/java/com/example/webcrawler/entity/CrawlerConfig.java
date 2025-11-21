@@ -33,7 +33,7 @@ public class CrawlerConfig {
 
     private LocalDateTime createdAt;
     private LocalDateTime lastRunAt;
-
+    private boolean stayOnDomain;
     @Enumerated(EnumType.STRING)
     private ConfigStatus status;
 

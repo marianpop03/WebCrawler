@@ -13,9 +13,10 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
+
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -37,6 +38,7 @@ public class CrawlerService {
 
     @Autowired
     private UrlRepository urlRepository;
+
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
@@ -45,6 +47,7 @@ public class CrawlerService {
 
     @Autowired
     private CrawlerConfigRepository crawlerConfigRepository;
+
     private final Queue<String> urlQueue = new ConcurrentLinkedQueue<>();
     private final Set<String> visitedUrls = Collections.synchronizedSet(new HashSet<>());
     private ExecutorService executorService;
@@ -67,7 +70,6 @@ public class CrawlerService {
             return;
         }
         currentConfig = configOptional.get();
-
 
         int threadCount = currentConfig.getThreadCount() != null && currentConfig.getThreadCount() > 0 ?
                 currentConfig.getThreadCount() : 5;
@@ -92,6 +94,9 @@ public class CrawlerService {
         crawlerConfigRepository.save(currentConfig);
 
         log.info("Crawler-ul a pornit cu configurația ID: {}", currentConfig.getId());
+
+        // Trimitem status inițial
+        sendCrawlerStatusUpdate();
 
         for (int i = 0; i < threadCount; i++) {
             executorService.submit(this::crawlWorker);
@@ -125,6 +130,7 @@ public class CrawlerService {
         urlQueue.clear();
         visitedUrls.clear();
         currentConfig = null;
+        sendCrawlerStatusUpdate();
     }
 
     /**
@@ -180,7 +186,6 @@ public class CrawlerService {
             return;
         }
 
-
         Optional<Url> existingUrlOpt = urlRepository.findByUrl(currentUrl);
         if (existingUrlOpt.isPresent() && existingUrlOpt.get().getStatus() == Url.UrlStatus.VISITED) {
             log.debug("URL {} a fost deja vizitat și salvat în DB.", currentUrl);
@@ -191,16 +196,16 @@ public class CrawlerService {
 
         Document doc;
         try {
-
             doc = Jsoup.connect(currentUrl)
                     .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36")
-                    .timeout(10 * 1000) // 10 secunde timeout
+                    .timeout(10 * 1000)
                     .get();
         } catch (IOException e) {
             log.error("Eroare la descărcarea URL-ului {}: {}", currentUrl, e.getMessage());
             saveUrlStatus(currentUrl, Url.UrlStatus.FAILED);
             return;
         }
+
         Url urlEntity = existingUrlOpt.orElseGet(() -> {
             Url newUrl = new Url();
             newUrl.setUrl(currentUrl);
@@ -220,7 +225,9 @@ public class CrawlerService {
         pageContentRepository.save(pageContent);
 
         log.info("Conținut salvat pentru URL: {}", currentUrl);
-        sendCrawlerStatusUpdate();
+
+        // Trimitem actualizare specifică
+        sendCrawlerStatusUpdate(currentUrl, Url.UrlStatus.VISITED);
 
         if (currentConfig.getMaxDepth() != null && currentConfig.getMaxDepth() > depth) {
             extractLinks(doc, currentUrl, depth);
@@ -229,9 +236,6 @@ public class CrawlerService {
 
     /**
      * Extrage link-urile dintr-un document HTML și le adaugă în coadă.
-     * @param doc Documentul HTML.
-     * @param baseUrl URL-ul de bază al paginii curente.
-     * @param currentDepth Adâncimea curentă.
      */
     private void extractLinks(Document doc, String baseUrl, int currentDepth) throws URISyntaxException {
         Elements links = doc.select("a[href]");
@@ -249,11 +253,8 @@ public class CrawlerService {
         }
     }
 
-
     /**
      * Salvează sau actualizează statusul unui URL în baza de date.
-     * @param urlString URL-ul
-     * @param status Statusul de setat
      */
     private void saveUrlStatus(String urlString, Url.UrlStatus status) {
         Url urlEntity = urlRepository.findByUrl(urlString)
@@ -266,16 +267,15 @@ public class CrawlerService {
         urlEntity.setStatus(status);
         urlEntity.setVisitDate(LocalDateTime.now());
         urlRepository.save(urlEntity);
-        sendCrawlerStatusUpdate();
+
+        // Trimitem actualizare specifică
+        sendCrawlerStatusUpdate(urlString, status);
     }
 
     /**
      * Extrage metadata (description, keywords) din tag-urile HTML.
-     * @param doc Documentul HTML.
-     * @return String JSON cu metadata sau un string gol.
      */
     private String extractMetadata(Document doc) {
-
         String description = doc.select("meta[name=description]").attr("content");
         String keywords = doc.select("meta[name=keywords]").attr("content");
         StringBuilder metadata = new StringBuilder();
@@ -295,7 +295,7 @@ public class CrawlerService {
     private boolean isValidUrl(String url) {
         try {
             new URI(url).parseServerAuthority();
-            return (url.startsWith("http`://") || url.startsWith("https://"));
+            return (url.startsWith("http://") || url.startsWith("https://"));
         } catch (URISyntaxException e) {
             return false;
         }
@@ -309,8 +309,11 @@ public class CrawlerService {
         return (currentConfig.isExcludeImages() && (lowerUrl.endsWith(".jpg") || lowerUrl.endsWith(".jpeg") || lowerUrl.endsWith(".png") || lowerUrl.endsWith(".gif"))) ||
                 (currentConfig.isExcludePdfs() && lowerUrl.endsWith(".pdf"));
     }
-    private void sendCrawlerStatusUpdate() {
 
+    /**
+     * Trimite actualizare prin WebSocket cu detalii despre ultimul URL.
+     */
+    private void sendCrawlerStatusUpdate(String lastProcessedUrl, Url.UrlStatus status) {
         long visitedCount = urlRepository.countByStatus(Url.UrlStatus.VISITED);
         long pendingCount = urlRepository.countByStatus(Url.UrlStatus.PENDING);
         long failedCount = urlRepository.countByStatus(Url.UrlStatus.FAILED);
@@ -320,10 +323,22 @@ public class CrawlerService {
         statusUpdate.put("visitedCount", visitedCount);
         statusUpdate.put("pendingCount", pendingCount);
         statusUpdate.put("failedCount", failedCount);
+
+        if (lastProcessedUrl != null && status != null) {
+            statusUpdate.put("recentUrl", lastProcessedUrl);
+            statusUpdate.put("recentStatus", status.toString());
+        }
+
         messagingTemplate.convertAndSend("/topic/crawlerStatus", statusUpdate);
         log.debug("Trimis actualizare status crawler prin WebSocket.");
     }
 
+    /**
+     * Overload pentru apeluri simple (fără URL specific), ex: la start/stop.
+     */
+    private void sendCrawlerStatusUpdate() {
+        sendCrawlerStatusUpdate(null, null);
+    }
 
     @PreDestroy
     public void shutdown() {

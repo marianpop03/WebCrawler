@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,7 +15,18 @@
 </head>
 <body>
 <div class="container">
-    <h1 class="mb-4">Status Crawler</h1>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">Web Crawler Application</h1> <!-- Titlul aplicației -->
+
+        <!-- Secțiunea de autentificare/înregistrare, aliniată la dreapta -->
+        <div sec:authorize="isAuthenticated()">
+            <span class="me-3">Salut, <strong th:text="${username}">Utilizator</strong>!</span>
+            <form th:action="@{/logout}" method="post" style="display: inline;">
+                <button type="submit" class="btn btn-outline-danger btn-sm">Deconectare</button>
+            </form>
+        </div>
+
+</div>
     <ul class="nav nav-tabs mb-4">
         <li class="nav-item">
             <a class="nav-link" href="/">Acasă</a>
@@ -119,6 +130,7 @@
     }
 
     function showCrawlerStatus(statusUpdate) {
+        // 1. Actualizare Badges (Numere)
         var statusBadge = document.querySelector('.status-badge');
         if (statusUpdate.isRunning) {
             statusBadge.classList.remove('bg-secondary');
@@ -133,6 +145,55 @@
         document.getElementById('visitedCount').textContent = statusUpdate.visitedCount;
         document.getElementById('pendingCount').textContent = statusUpdate.pendingCount;
         document.getElementById('failedCount').textContent = statusUpdate.failedCount;
+
+        // 2. Actualizare Liste (Adăugare dinamică)
+        if (statusUpdate.recentUrl && statusUpdate.recentStatus) {
+            let listId = null;
+            let emptyMsgId = null;
+
+            if (statusUpdate.recentStatus === 'VISITED') {
+                listId = 'visitedUrlsList';
+                emptyMsgId = 'visitedEmptyMessage';
+            } else if (statusUpdate.recentStatus === 'FAILED') {
+                listId = 'failedUrlsList';
+                emptyMsgId = 'failedEmptyMessage';
+            }
+
+            if (listId) {
+                const list = document.getElementById(listId);
+                const emptyMsg = document.getElementById(emptyMsgId);
+
+                // Ascundem mesajul "Niciun URL..."
+                if (emptyMsg) emptyMsg.style.display = 'none';
+
+                // Creăm elementul nou
+                const li = document.createElement('li');
+                li.className = 'list-group-item list-group-item-action animate__animated animate__fadeIn'; // Clase Bootstrap + animație (opțional)
+
+                // Formatăm data curentă
+                const now = new Date().toLocaleTimeString();
+
+                if (statusUpdate.recentStatus === 'VISITED') {
+                    li.innerHTML = `
+                        <a href="${statusUpdate.recentUrl}" target="_blank" class="fw-bold text-decoration-none">${statusUpdate.recentUrl}</a>
+                        <small class="text-muted d-block">Vizitat acum (${now})</small>
+                    `;
+                } else {
+                    li.innerHTML = `
+                        <span class="text-danger">${statusUpdate.recentUrl}</span>
+                        <small class="text-muted d-block">Eșuat acum (${now})</small>
+                    `;
+                }
+
+                // Adăugăm la începutul listei
+                list.insertBefore(li, list.firstChild);
+
+                // 3. Curățenie (păstrăm doar ultimele 20 elemente ca să nu blocăm browserul)
+                if (list.children.length > 20) {
+                    list.removeChild(list.lastChild);
+                }
+            }
+        }
     }
 
     window.onload = function() {

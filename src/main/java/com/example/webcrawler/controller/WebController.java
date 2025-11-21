@@ -1,5 +1,6 @@
 package com.example.webcrawler.controller;
-
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import com.example.webcrawler.entity.CrawlerConfig;
 import com.example.webcrawler.entity.PageContent;
 import com.example.webcrawler.entity.Url;
@@ -51,6 +52,12 @@ public class WebController {
         }
         model.addAttribute("configs", crawlerConfigRepository.findAll());
         model.addAttribute("isCrawlerRunning", crawlerService.isRunning());
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated() && !(authentication.getPrincipal() instanceof String)) {
+            model.addAttribute("username", authentication.getName());
+        } else {
+            model.addAttribute("username", "Guest"); // Pentru utilizatorii neautentificați
+        }
         return "index";
     }
 
@@ -151,6 +158,12 @@ public class WebController {
         model.addAttribute("failedUrls", failedUrls);
         model.addAttribute("isCrawlerRunning", crawlerService.isRunning());
 
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated() && !(authentication.getPrincipal() instanceof String)) {
+            model.addAttribute("username", authentication.getName());
+        } else {
+            model.addAttribute("username", "Guest");
+        }
         return "status";
     }
 
@@ -168,6 +181,12 @@ public class WebController {
         }
         model.addAttribute("keyword", keyword);
         model.addAttribute("searchResults", searchResults);
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated() && !(authentication.getPrincipal() instanceof String)) {
+            model.addAttribute("username", authentication.getName());
+        } else {
+            model.addAttribute("username", "Guest");
+        }
         return "searchResults";
     }
 }
