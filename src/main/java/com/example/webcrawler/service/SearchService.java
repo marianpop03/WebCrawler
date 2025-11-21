@@ -20,19 +20,20 @@ public class SearchService {
      * Căutarea este case-insensitive.
      *
      * @param keyword Cuvântul cheie de căutat.
+     * @param domain
      * @return O listă de PageContent care se potrivesc criteriilor.
      */
-    public List<PageContent> searchByKeyword(String keyword) {
+    public List<PageContent> searchByKeyword(String keyword, String domain) {
         if (keyword == null || keyword.trim().isEmpty()) {
-            log.warn("Cuvântul cheie pentru căutare este gol sau null.");
             return List.of();
         }
 
         String trimmedKeyword = keyword.trim();
-        log.info("Caut pagini pentru cuvântul cheie: '{}'", trimmedKeyword);
-        List<PageContent> results = pageContentRepository.findByContentTextContainingIgnoreCaseOrPageTitleContainingIgnoreCase(trimmedKeyword, trimmedKeyword);
+        String trimmedDomain = (domain != null) ? domain.trim() : null;
 
-        log.info("S-au găsit {} rezultate pentru cuvântul cheie: '{}'", results.size(), trimmedKeyword);
-        return results;
+        log.info("Caut keyword: '{}' pe domeniul: '{}'", trimmedKeyword, trimmedDomain);
+
+        // Apelăm noua metodă din repository
+        return pageContentRepository.searchByKeywordAndDomain(trimmedKeyword, trimmedDomain);
     }
 }

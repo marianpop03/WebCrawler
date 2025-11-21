@@ -37,6 +37,7 @@ public class CrawlerConfig {
     @Enumerated(EnumType.STRING)
     private ConfigStatus status;
 
+
     public enum ConfigStatus {
         ACTIVE,
         INACTIVE

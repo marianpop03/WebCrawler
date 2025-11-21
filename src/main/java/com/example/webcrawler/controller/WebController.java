@@ -17,7 +17,9 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -37,6 +39,9 @@ public class WebController {
 
     @Autowired
     private UrlRepository urlRepository;
+
+    @Autowired
+    private com.example.webcrawler.repository.PageContentRepository pageContentRepository;
 
     /**
      * Afișează pagina principală cu formularul de configurare a crawler-ului
@@ -59,6 +64,16 @@ public class WebController {
             model.addAttribute("username", "Guest"); // Pentru utilizatorii neautentificați
         }
         return "index";
+    }
+
+    @GetMapping("/export/json")
+    public ResponseEntity<List<PageContent>> exportJson() {
+        List<PageContent> data = pageContentRepository.findAll();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=results.json")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(data);
     }
 
     /**
@@ -174,12 +189,18 @@ public class WebController {
      * @return Numele template-ului HTML (searchResults.html).
      */
     @GetMapping("/search")
-    public String search(@RequestParam(required = false) String keyword, Model model) {
+    public String search(@RequestParam(required = false) String keyword,
+                         @RequestParam(required = false) String domain, // Parametru nou
+                         Model model) {
         List<PageContent> searchResults = Collections.emptyList();
+
         if (keyword != null && !keyword.trim().isEmpty()) {
-            searchResults = searchService.searchByKeyword(keyword);
+            // Apelăm serviciul cu ambele argumente
+            searchResults = searchService.searchByKeyword(keyword, domain);
         }
+
         model.addAttribute("keyword", keyword);
+        model.addAttribute("domain", domain); // Trimitem înapoi în view ca să rămână completat
         model.addAttribute("searchResults", searchResults);
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.isAuthenticated() && !(authentication.getPrincipal() instanceof String)) {

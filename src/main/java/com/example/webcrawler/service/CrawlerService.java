@@ -240,10 +240,27 @@ public class CrawlerService {
     private void extractLinks(Document doc, String baseUrl, int currentDepth) throws URISyntaxException {
         Elements links = doc.select("a[href]");
 
+        // Determinăm domeniul de bază al seed-ului (primul URL din listă)
+        String seedDomain = "";
+        if (currentConfig.isStayOnDomain() && currentConfig.getSeedUrls() != null) {
+            String firstSeed = currentConfig.getSeedUrls().split(",")[0].trim();
+            seedDomain = getDomainName(firstSeed);
+        }
+
         for (Element link : links) {
             String absUrl = link.attr("abs:href");
             if (!isValidUrl(absUrl) || isFileUrl(absUrl)) {
                 continue;
+            }
+
+            // LOGICA NOUĂ: Verificare domeniu
+            if (currentConfig.isStayOnDomain() && !seedDomain.isEmpty()) {
+                String linkDomain = getDomainName(absUrl);
+                // Dacă domeniul link-ului nu conține domeniul seed (ex: unibuc.ro), îl ignorăm
+                if (!linkDomain.contains(seedDomain)) {
+                    log.debug("URL ignorat (domeniu extern): {}", absUrl);
+                    continue;
+                }
             }
 
             if (!visitedUrls.contains(absUrl) && !urlQueue.contains(absUrl)) {
@@ -253,6 +270,19 @@ public class CrawlerService {
         }
     }
 
+    // Metodă ajutătoare pentru extragerea domeniului (fără www)
+    private String getDomainName(String url) {
+        try {
+            URI uri = new URI(url);
+            String domain = uri.getHost();
+            if (domain != null) {
+                return domain.startsWith("www.") ? domain.substring(4) : domain;
+            }
+        } catch (URISyntaxException e) {
+            log.warn("Nu s-a putut extrage domeniul din: {}", url);
+        }
+        return "";
+    }
     /**
      * Salvează sau actualizează statusul unui URL în baza de date.
      */

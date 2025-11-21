@@ -83,6 +83,10 @@
                             <input type="checkbox" th:field="*{excludePdfs}" id="excludePdfs" class="form-check-input">
                             <label for="excludePdfs" class="form-check-label">Exclude PDF-uri</label>
                         </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" th:field="*{stayOnDomain}" id="stayOnDomain" class="form-check-input">
+                            <label for="stayOnDomain" class="form-check-label">Rămâi pe același domeniu (Restricționare domeniu)</label>
+                        </div>
                         <button type="submit" class="btn btn-primary">Salvează Configurația</button>
                     </form>
                 </div>
@@ -137,6 +141,7 @@
                             <button type="submit" class="btn btn-warning btn-action">Oprește Crawler</button>
                         </form>
                         <a th:href="@{/status}" class="btn btn-info btn-action">Vezi Status Detaliat</a>
+                        <a th:href="@{/export/json}" class="btn btn-dark btn-action" target="_blank">Exportă Date (JSON)</a>
                     </div>
                     <div th:unless="${isCrawlerRunning}">
                         <p>Crawler-ul este oprit. Selectează o configurație și pornește-l.</p>
