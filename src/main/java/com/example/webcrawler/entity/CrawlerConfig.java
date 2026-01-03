@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
-
 import java.time.LocalDateTime;
 
 @Entity
@@ -17,7 +16,9 @@ public class CrawlerConfig {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
     @Column(nullable = false, length = 4096)
     private String seedUrls;
 
@@ -30,21 +31,21 @@ public class CrawlerConfig {
 
     private boolean excludeImages;
     private boolean excludePdfs;
+    private boolean stayOnDomain;
 
     private LocalDateTime createdAt;
     private LocalDateTime lastRunAt;
-    private boolean stayOnDomain;
+
     @Enumerated(EnumType.STRING)
     private ConfigStatus status;
 
-
     public enum ConfigStatus {
-        ACTIVE,
-        INACTIVE
+        ACTIVE, INACTIVE
     }
 
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
     }
+
 }

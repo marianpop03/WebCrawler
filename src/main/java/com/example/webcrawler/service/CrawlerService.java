@@ -226,7 +226,7 @@ public class CrawlerService {
 
         log.info("Conținut salvat pentru URL: {}", currentUrl);
 
-        // Trimitem actualizare specifică
+
         sendCrawlerStatusUpdate(currentUrl, Url.UrlStatus.VISITED);
 
         if (currentConfig.getMaxDepth() != null && currentConfig.getMaxDepth() > depth) {
@@ -239,8 +239,6 @@ public class CrawlerService {
      */
     private void extractLinks(Document doc, String baseUrl, int currentDepth) throws URISyntaxException {
         Elements links = doc.select("a[href]");
-
-        // Determinăm domeniul de bază al seed-ului (primul URL din listă)
         String seedDomain = "";
         if (currentConfig.isStayOnDomain() && currentConfig.getSeedUrls() != null) {
             String firstSeed = currentConfig.getSeedUrls().split(",")[0].trim();
@@ -253,10 +251,9 @@ public class CrawlerService {
                 continue;
             }
 
-            // LOGICA NOUĂ: Verificare domeniu
             if (currentConfig.isStayOnDomain() && !seedDomain.isEmpty()) {
                 String linkDomain = getDomainName(absUrl);
-                // Dacă domeniul link-ului nu conține domeniul seed (ex: unibuc.ro), îl ignorăm
+
                 if (!linkDomain.contains(seedDomain)) {
                     log.debug("URL ignorat (domeniu extern): {}", absUrl);
                     continue;
@@ -270,7 +267,6 @@ public class CrawlerService {
         }
     }
 
-    // Metodă ajutătoare pentru extragerea domeniului (fără www)
     private String getDomainName(String url) {
         try {
             URI uri = new URI(url);
@@ -297,8 +293,6 @@ public class CrawlerService {
         urlEntity.setStatus(status);
         urlEntity.setVisitDate(LocalDateTime.now());
         urlRepository.save(urlEntity);
-
-        // Trimitem actualizare specifică
         sendCrawlerStatusUpdate(urlString, status);
     }
 
@@ -366,6 +360,35 @@ public class CrawlerService {
     /**
      * Overload pentru apeluri simple (fără URL specific), ex: la start/stop.
      */
+    public boolean isExcluded(String url) {
+        String lowerUrl = url.toLowerCase();
+        return lowerUrl.endsWith(".jpg") ||
+                lowerUrl.endsWith(".jpeg") ||
+                lowerUrl.endsWith(".png") ||
+                lowerUrl.endsWith(".pdf") ||
+                lowerUrl.endsWith(".gif") ||
+                lowerUrl.endsWith(".zip");
+    }
+
+    public String getDomain(String url) {
+        try {
+            java.net.URI uri = new java.net.URI(url);
+            String host = uri.getHost();
+            if (host == null) return null;
+
+            if (host.startsWith("www.")) {
+                host = host.substring(4);
+            }
+            String[] parts = host.split("\\.");
+            if (parts.length > 2) {
+                return parts[parts.length - 2] + "." + parts[parts.length - 1];
+            }
+
+            return host;
+        } catch (Exception e) {
+            return null;
+        }
+    }
     private void sendCrawlerStatusUpdate() {
         sendCrawlerStatusUpdate(null, null);
     }
@@ -375,4 +398,6 @@ public class CrawlerService {
         stopCrawling();
         log.info("CrawlerService shutdown hook executat.");
     }
+
+
 }

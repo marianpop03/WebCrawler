@@ -23,12 +23,12 @@ public class User {
     private String username;
 
     @Column(nullable = false)
-    private String password; // Parola va fi stocată criptată
+    private String password;
 
     @Column(nullable = false, unique = true)
     private String email;
 
-    @ManyToMany(fetch = FetchType.EAGER) // Încărcăm rolurile imediat
+    @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_roles",
             joinColumns = @JoinColumn(name = "user_id"),

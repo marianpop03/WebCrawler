@@ -17,7 +17,7 @@ public class Role {
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private String name; // Ex: ROLE_USER, ROLE_ADMIN
+    private String name;
 
     public Role(String name) {
         this.name = name;

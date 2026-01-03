@@ -32,8 +32,6 @@ public class SearchService {
         String trimmedDomain = (domain != null) ? domain.trim() : null;
 
         log.info("Caut keyword: '{}' pe domeniul: '{}'", trimmedKeyword, trimmedDomain);
-
-        // Apelăm noua metodă din repository
         return pageContentRepository.searchByKeywordAndDomain(trimmedKeyword, trimmedDomain);
     }
 }

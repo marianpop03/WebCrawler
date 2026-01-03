@@ -1,4 +1,5 @@
 package com.example.webcrawler.controller;
+import com.example.webcrawler.entity.User;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import com.example.webcrawler.entity.CrawlerConfig;
@@ -20,9 +21,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import com.example.webcrawler.repository.UserRepository;
+import java.security.Principal;
 
 @Controller
 @Slf4j
@@ -43,27 +44,63 @@ public class WebController {
     @Autowired
     private com.example.webcrawler.repository.PageContentRepository pageContentRepository;
 
-    /**
-     * Afișează pagina principală cu formularul de configurare a crawler-ului
-     * și o listă de configurații existente.
-     * @param model Modelul Thymeleaf.
-     * @return Numele template-ului HTML (index.html).
-     */
-    @GetMapping("/")
-    public String index(Model model) {
+    @Autowired
+    private UserRepository userRepository;
 
+    @GetMapping("/")
+    public String index(Model model, Principal principal) {
+        // 1. Inițializăm variabilele cu valori default (pentru a evita NULL)
+        List<CrawlerConfig> configs = Collections.emptyList();
+        String username = "Guest";
+
+        // 2. Dacă utilizatorul este logat, încercăm să îi încărcăm datele
+        if (principal != null) {
+            username = principal.getName();
+            // Căutăm userul în baza de date
+            User currentUser = userRepository.findByUsername(username).orElse(null);
+
+            if (currentUser != null) {
+                // Dacă userul există în DB, îi încărcăm configurațiile
+                configs = crawlerConfigRepository.findByUser(currentUser);
+            }
+        }
+
+        // 3. Adăugăm variabilele în model
+        model.addAttribute("configs", configs);
+        model.addAttribute("username", username);
+
+        // 4. Configurația pentru formularul de adăugare
         if (!model.containsAttribute("crawlerConfig")) {
             model.addAttribute("crawlerConfig", new CrawlerConfig());
         }
-        model.addAttribute("configs", crawlerConfigRepository.findAll());
+
         model.addAttribute("isCrawlerRunning", crawlerService.isRunning());
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated() && !(authentication.getPrincipal() instanceof String)) {
-            model.addAttribute("username", authentication.getName());
-        } else {
-            model.addAttribute("username", "Guest"); // Pentru utilizatorii neautentificați
-        }
         return "index";
+    }
+
+    @PostMapping("/saveConfig")
+    public String saveConfig(@ModelAttribute CrawlerConfig crawlerConfig,
+                             RedirectAttributes redirectAttributes,
+                             Principal principal) {
+
+        if (principal == null) {
+            return "redirect:/login";
+        }
+
+
+        String username = principal.getName();
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        crawlerConfig.setUser(currentUser); // <--- AICI SE FACE ASOCIEREA
+
+        if (crawlerConfig.getStatus() == null) {
+            crawlerConfig.setStatus(CrawlerConfig.ConfigStatus.ACTIVE);
+        }
+
+        crawlerConfigRepository.save(crawlerConfig);
+        redirectAttributes.addFlashAttribute("message", "Configurația a fost salvată în contul tău!");
+        return "redirect:/";
     }
 
     @GetMapping("/export/json")
@@ -82,16 +119,6 @@ public class WebController {
      * @param redirectAttributes Atribute pentru redirecționare (mesaje flash).
      * @return Redirecționează către pagina principală.
      */
-    @PostMapping("/saveConfig")
-    public String saveConfig(@ModelAttribute CrawlerConfig crawlerConfig, RedirectAttributes redirectAttributes) {
-
-        if (crawlerConfig.getStatus()==null) {
-            crawlerConfig.setStatus(CrawlerConfig.ConfigStatus.ACTIVE);
-        }
-        crawlerConfigRepository.save(crawlerConfig);
-        redirectAttributes.addFlashAttribute("message", "Configurația a fost salvată cu succes!");
-        return "redirect:/";
-    }
 
     /**
      * Încarcă o configurație existentă în formular pentru editare.
@@ -99,16 +126,19 @@ public class WebController {
      * @param model Modelul Thymeleaf.
      * @return Redirecționează către pagina principală cu configurația preîncărcată.
      */
+
     @GetMapping("/editConfig")
-    public String editConfig(@RequestParam Long id, Model model) {
+    public String editConfig(@RequestParam Long id, Model model, Principal principal) { // 1. Adaugă Principal aici
         Optional<CrawlerConfig> configOptional = crawlerConfigRepository.findById(id);
+
         if (configOptional.isPresent()) {
-            model.addAttribute("crawlerConfig", configOptional.get());
+            CrawlerConfig config = configOptional.get();
+            model.addAttribute("crawlerConfig", config);
         } else {
             model.addAttribute("crawlerConfig", new CrawlerConfig());
             model.addAttribute("errorMessage", "Configurația cu ID-ul " + id + " nu a fost găsită.");
         }
-        return index(model);
+        return index(model, principal);
     }
 
     /**
@@ -188,26 +218,46 @@ public class WebController {
      * @param model Modelul Thymeleaf.
      * @return Numele template-ului HTML (searchResults.html).
      */
+    /**
+     * Afișează pagina de căutare și rezultatele căutării.
+     */
     @GetMapping("/search")
     public String search(@RequestParam(required = false) String keyword,
-                         @RequestParam(required = false) String domain, // Parametru nou
+                         @RequestParam(required = false) String domain,
                          Model model) {
-        List<PageContent> searchResults = Collections.emptyList();
 
+
+        List<PageContent> searchResults = Collections.emptyList();
         if (keyword != null && !keyword.trim().isEmpty()) {
-            // Apelăm serviciul cu ambele argumente
             searchResults = searchService.searchByKeyword(keyword, domain);
         }
+        List<Url> visitedUrls = urlRepository.findByStatus(Url.UrlStatus.VISITED);
+
+
+        java.util.Set<String> availableDomains = visitedUrls.stream()
+                .map(u -> {
+                    try {
+                        return new java.net.URI(u.getUrl()).getHost();
+                    } catch (Exception e) { return null; }
+                })
+                .filter(java.util.Objects::nonNull)
+                .map(d -> d.startsWith("www.") ? d.substring(4) : d)
+                .collect(java.util.stream.Collectors.toSet());
+
 
         model.addAttribute("keyword", keyword);
-        model.addAttribute("domain", domain); // Trimitem înapoi în view ca să rămână completat
+        model.addAttribute("domain", domain);
         model.addAttribute("searchResults", searchResults);
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        model.addAttribute("availableDomains", availableDomains);
+
+
+        org.springframework.security.core.Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.isAuthenticated() && !(authentication.getPrincipal() instanceof String)) {
             model.addAttribute("username", authentication.getName());
         } else {
             model.addAttribute("username", "Guest");
         }
+
         return "searchResults";
     }
 }
